@@ -5,19 +5,23 @@ import numpy as np
 # Step 1: Create a downloadable CSV template
 def create_template():
     template_data = {
-        "RPM": ["650", "800", "992", "1248", "1500", "1750", "2016", "2496", "3008", "3488", "4000", "4512", "4992", "5504", "6016", "6592"],
-        "0": ["0"] * 16,
-        "25": [""] * 16,
-        "50": [""] * 16,
-        "100": [""] * 16,
-        "150": [""] * 16,
-        "200": [""] * 16,
-        "250": [""] * 16,
-        "300": [""] * 16,
-        "350": [""] * 16,
-        "400": [""] * 16,
-        "450": [""] * 16,
-        "500": [""] * 16
+        "Torque (Nm)": ["0", "25", "50", "100", "150", "200", "250", "300", "350", "400", "450", "500"],
+        "650": ["" for _ in range(12)],
+        "800": ["" for _ in range(12)],
+        "992": ["" for _ in range(12)],
+        "1248": ["" for _ in range(12)],
+        "1500": ["" for _ in range(12)],
+        "1750": ["" for _ in range(12)],
+        "2016": ["" for _ in range(12)],
+        "2496": ["" for _ in range(12)],
+        "3008": ["" for _ in range(12)],
+        "3488": ["" for _ in range(12)],
+        "4000": ["" for _ in range(12)],
+        "4512": ["" for _ in range(12)],
+        "4992": ["" for _ in range(12)],
+        "5504": ["" for _ in range(12)],
+        "6016": ["" for _ in range(12)],
+        "6592": ["" for _ in range(12)]
     }
     df_template = pd.DataFrame(template_data)
     df_template.to_csv('template.csv', index=False)
@@ -44,10 +48,10 @@ def main():
         # Convert to numeric values
         df = df.apply(pd.to_numeric, errors='coerce')
 
-        # Extract RPM values and torque axis
-        rpm_values = df.iloc[0, 1:].values
-        torque_axis = df.iloc[1:, 0].values
-        airflow_data = df.iloc[1:, 1:].values
+        # Extract torque values and RPM axis
+        torque_axis = df.iloc[:, 0].values
+        rpm_values = df.columns[1:].astype(int)
+        airflow_data = df.iloc[:, 1:].values
 
         # Calculate airflow per torque factor
         airflow_per_torque = airflow_data / torque_axis[:, np.newaxis]
@@ -59,7 +63,7 @@ def main():
 
         if st.button("Generate New Map"):
             # Calculate new airflow values using the new torque axis
-            new_airflow_values = airflow_per_torque * np.array(new_torque_axis)[:, np.newaxis]
+            new_airflow_values = np.outer(new_torque_axis, airflow_per_torque.mean(axis=0))
 
             # Create a DataFrame to display the results
             result_df = pd.DataFrame(new_airflow_values, columns=df.columns[1:], index=new_torque_axis)
