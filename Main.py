@@ -141,7 +141,7 @@ def main():
             csv1 = result_df1.to_csv().encode('utf-8')
             st.download_button(label="Download New Airflow Map as CSV", data=csv1, file_name='new_airflow_map.csv', mime='text/csv')
 
-            # Proceed with the reference torque map
+                        # Proceed with the reference torque map
             reference_torque_axis = df2.iloc[:, 0].values
             rpm_values2 = df2.columns[1:].astype(int)
             reference_torque_data = df2.iloc[:, 1:].values
@@ -151,4 +151,44 @@ def main():
                 reference_torque_per_factor = np.where(reference_torque_axis[:, np.newaxis] != 0, reference_torque_data / reference_torque_axis[:, np.newaxis], 0)
 
             # Generate new reference torque axis
-            new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result
+            new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result_df1))]
+
+            # Calculate new reference torque values using the new torque axis
+            new_reference_torque_values = reference_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
+
+            # Create a DataFrame to display the results
+            result_df2 = pd.DataFrame(new_reference_torque_values, columns=df2.columns[1:], index=new_reference_torque_axis)
+            result_df2.index.name = "Reference Torque (Nm)"
+
+            st.write("### New Reference Torque Map")
+            st.dataframe(result_df2)
+
+            # Provide option to download the new map as a CSV
+            csv2 = result_df2.to_csv().encode('utf-8')
+            st.download_button(label="Download New Reference Torque Map as CSV", data=csv2, file_name='new_reference_torque_map.csv', mime='text/csv')
+
+            # Proceed with the indicated torque map
+            indicated_torque_axis = df3.iloc[:, 0].values
+            rpm_values3 = df3.columns[1:].astype(int)
+            indicated_torque_data = df3.iloc[:, 1:].values
+
+            # Calculate indicated torque per factor
+            with np.errstate(divide='ignore', invalid='ignore'):
+                indicated_torque_per_factor = np.where(indicated_torque_axis[:, np.newaxis] != 0, indicated_torque_data / indicated_torque_axis[:, np.newaxis], 0)
+
+            # Use the same new_reference_torque_axis for indicated torque
+            new_indicated_torque_values = indicated_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
+
+            # Create a DataFrame to display the results
+            result_df3 = pd.DataFrame(new_indicated_torque_values, columns=df3.columns[1:], index=new_reference_torque_axis)
+            result_df3.index.name = "Indicated Torque (Nm)"
+
+            st.write("### New Indicated Torque Map")
+            st.dataframe(result_df3)
+
+            # Provide option to download the new map as a CSV
+            csv3 = result_df3.to_csv().encode('utf-8')
+            st.download_button(label="Download New Indicated Torque Map as CSV", data=csv3, file_name='new_indicated_torque_map.csv', mime='text/csv')
+
+if __name__ == "__main__":
+    main()
