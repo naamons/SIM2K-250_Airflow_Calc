@@ -73,12 +73,8 @@ def main():
             result_df = pd.DataFrame(new_airflow_values, columns=df.columns[1:], index=new_torque_axis)
             result_df.index.name = "Torque (Nm)"
 
-            # Apply conditional formatting
-            def color_scale(val):
-                color = 'background-color: #FF6666' if val > 1500 else 'background-color: #FF9966' if val > 1000 else 'background-color: #FFFF66' if val > 500 else 'background-color: #66FF66'
-                return color
-
-            styled_df = result_df.style.applymap(color_scale)
+            # Apply conditional formatting with gradient color scale
+            styled_df = result_df.style.background_gradient(cmap='coolwarm')
             st.write("### New Airflow Map")
             st.dataframe(styled_df)
 
