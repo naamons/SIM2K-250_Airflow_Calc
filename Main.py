@@ -67,15 +67,16 @@ def main():
     uploaded_file = st.file_uploader("Upload your filled combined template", type="csv")
 
     if uploaded_file is not None:
-        # Read the combined CSV and split into two DataFrames
-        combined_df = pd.read_csv(uploaded_file, skip_blank_lines=False, header=None)
-        
-        # Locate the split point
-        split_idx = combined_df[combined_df[0].str.contains("Reference Torque Map", na=False)].index[0]
+        # Read the combined CSV into a DataFrame
+        combined_df = pd.read_csv(uploaded_file, header=None)
+
+        # Locate the split points
+        airflow_start = combined_df[combined_df[0].str.contains("Airflow Map", na=False)].index[0]
+        reference_torque_start = combined_df[combined_df[0].str.contains("Reference Torque Map", na=False)].index[0]
 
         # Extract the two maps
-        airflow_df = pd.read_csv(uploaded_file, skiprows=1, nrows=split_idx-2)
-        reference_torque_df = pd.read_csv(uploaded_file, skiprows=split_idx+1)
+        airflow_df = pd.read_csv(uploaded_file, skiprows=airflow_start+1, nrows=reference_torque_start-airflow_start-2)
+        reference_torque_df = pd.read_csv(uploaded_file, skiprows=reference_torque_start+1)
 
         st.write("### Original Airflow Map")
         st.dataframe(airflow_df)
