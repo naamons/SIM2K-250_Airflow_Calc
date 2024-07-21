@@ -26,6 +26,18 @@ def create_template():
     df_template = pd.DataFrame(template_data)
     df_template.to_csv('template.csv', index=False)
 
+# Function to apply color scale
+def color_scale(val):
+    if val > 1500:
+        color = '#FF6666'  # Red
+    elif val > 1000:
+        color = '#FF9966'  # Orange
+    elif val > 500:
+        color = '#FFFF66'  # Yellow
+    else:
+        color = '#66FF66'  # Green
+    return f'background-color: {color}'
+
 # Step 2: Streamlit app
 def main():
     st.title("ECU Map Rescaler")
@@ -73,8 +85,8 @@ def main():
             result_df = pd.DataFrame(new_airflow_values, columns=df.columns[1:], index=new_torque_axis)
             result_df.index.name = "Torque (Nm)"
 
-            # Apply conditional formatting with gradient color scale
-            styled_df = result_df.style.background_gradient(cmap='coolwarm')
+            # Apply custom conditional formatting
+            styled_df = result_df.style.applymap(color_scale)
             st.write("### New Airflow Map")
             st.dataframe(styled_df)
 
