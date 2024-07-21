@@ -95,7 +95,7 @@ def main():
         new_torque_axis_input1 = st.text_area("New Torque Axis (one value per line)", torque_axis_str1)
         new_torque_axis1 = [int(torque.strip()) for torque in new_torque_axis_input1.split("\n")]
 
-        if st.button("Generate New Airflow Map"):
+        if st.button("Generate New Maps"):
             # Calculate new airflow values using the new torque axis
             new_airflow_values = airflow_per_torque * np.array(new_torque_axis1)[:, np.newaxis]
 
@@ -110,8 +110,7 @@ def main():
             csv1 = result_df1.to_csv().encode('utf-8')
             st.download_button(label="Download New Airflow Map as CSV", data=csv1, file_name='new_airflow_map.csv', mime='text/csv')
 
-        # Proceed with the second map
-        if 'result_df1' in locals():
+            # Proceed with the second map
             # Extract reference torque values and RPM axis
             reference_torque_axis = df2.iloc[:, 0].values
             rpm_values2 = df2.columns[1:].astype(int)
@@ -124,20 +123,20 @@ def main():
             # Generate new reference torque axis
             new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result_df1))]
 
-            if st.button("Generate New Reference Torque Map"):
-                # Calculate new reference torque values using the new torque axis
-                new_reference_torque_values = reference_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
+            # Calculate new reference torque values using the new torque axis
+            new_reference_torque_values = reference_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
 
-                # Create a DataFrame to display the results
-                result_df2 = pd.DataFrame(new_reference_torque_values, columns=df2.columns[1:], index=new_reference_torque_axis)
-                result_df2.index.name = "Reference Torque (Nm)"
+            # Create a DataFrame to display the results
+            result_df2 = pd.DataFrame(new_reference_torque_values, columns=df2.columns[1:], index=new_reference_torque_axis)
+            result_df2.index.name = "Reference Torque (Nm)"
 
-                st.write("### New Reference Torque Map")
-                st.dataframe(result_df2)
+            st.write("### New Reference Torque Map")
+            st.dataframe(result_df2)
 
-                # Provide option to download the new map as a CSV
-                csv2 = result_df2.to_csv().encode('utf-8')
-                st.download_button(label="Download New Reference Torque Map as CSV", data=csv2, file_name='new_reference_torque_map.csv', mime='text/csv')
+            # Provide option to download the new map as a CSV
+            csv2 = result_df2.to_csv().encode('utf-8')
+            st.download_button(label="Download New Reference Torque Map as CSV", data=csv2, file_name='new_reference_torque_map.csv', mime='text/csv')
 
 if __name__ == "__main__":
     main()
+
