@@ -39,31 +39,35 @@ if indicated_torque_input and mass_airflow_inverse_input and reference_torque_in
     mass_airflow_inverse_df = parse_input_data(mass_airflow_inverse_input)
     reference_torque_inverse_df = parse_input_data(reference_torque_inverse_input)
 
-    # Interpolation and Extrapolation Functions
-    def interpolate_and_extrapolate(new_max_torque, stock_boost, new_boost_target, rpm_values, torque_axis):
-        torque_increase_factor = new_max_torque / stock_boost
+    # Function to interpolate and extrapolate
+    def interpolate_and_extrapolate(indicated_torque_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_max_torque, new_boost_target):
+        # Calculate the torque increase factor
+        stock_max_torque = indicated_torque_df.max().max()  # Assuming the max value in the indicated torque is the stock max torque
+        torque_increase_factor = new_max_torque / stock_max_torque
+        
+        # Calculate the boost increase factor
         boost_increase_factor = new_boost_target / stock_boost
+        
+        # Interpolate the airflow values required for each torque value
+        new_mass_airflow_inverse_df = mass_airflow_inverse_df * boost_increase_factor
+        new_reference_torque_inverse_df = reference_torque_inverse_df * torque_increase_factor
+        
+        # Generate new indicated torque values
+        new_indicated_torque_df = indicated_torque_df * torque_increase_factor
+        
+        return new_indicated_torque_df, new_mass_airflow_inverse_df, new_reference_torque_inverse_df
 
-        new_torque_values = torque_axis * torque_increase_factor
-        new_air_mass_values = torque_axis * boost_increase_factor
-
-        new_indicated_torque_df = pd.DataFrame(index=rpm_values, columns=torque_axis)
-        new_mass_airflow_inverse_df = pd.DataFrame(index=rpm_values, columns=torque_axis)
-
-        for rpm in rpm_values:
-            new_indicated_torque_df.loc[rpm] = new_torque_values
-            new_mass_airflow_inverse_df.loc[rpm] = new_air_mass_values
-
-        return new_indicated_torque_df, new_mass_airflow_inverse_df
-
-    new_indicated_torque_df, new_mass_airflow_inverse_df = interpolate_and_extrapolate(
-        new_max_torque, stock_boost, new_boost_target, rpm_values, torque_axis)
+    new_indicated_torque_df, new_mass_airflow_inverse_df, new_reference_torque_inverse_df = interpolate_and_extrapolate(
+        indicated_torque_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_max_torque, new_boost_target)
 
     st.write('New Indicated Torque Table:')
     st.dataframe(new_indicated_torque_df)
 
     st.write('New Mass Airflow (Inverse) Table:')
     st.dataframe(new_mass_airflow_inverse_df)
+
+    st.write('New Reference Torque (Inverse) Table:')
+    st.dataframe(new_reference_torque_inverse_df)
 
     def format_for_copy_paste(df):
         return df.to_csv(sep='\t', index=False)
@@ -82,3 +86,9 @@ if indicated_torque_input and mass_airflow_inverse_input and reference_torque_in
         mime='text/csv'
     )
 
+    st.download_button(
+        label="Download New Reference Torque (Inverse) Table",
+        data=format_for_copy_paste(new_reference_torque_inverse_df),
+        file_name='new_reference_torque_inverse_table.csv',
+        mime='text/csv'
+    )
