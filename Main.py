@@ -151,4 +151,4 @@ def main():
                 reference_torque_per_factor = np.where(reference_torque_axis[:, np.newaxis] != 0, reference_torque_data / reference_torque_axis[:, np.newaxis], 0)
 
             # Generate new reference torque axis
-            new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result_df1
+            new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result
