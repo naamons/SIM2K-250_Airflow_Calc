@@ -40,7 +40,12 @@ if indicated_torque_input and mass_airflow_inverse_input and reference_torque_in
     indicated_torque_df = parse_input_data(indicated_torque_input)
     mass_airflow_inverse_df = parse_input_data(mass_airflow_inverse_input)
     reference_torque_inverse_df = parse_input_data(reference_torque_inverse_input)
-    
+
+    # Ensure all data is numeric
+    indicated_torque_df = indicated_torque_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+    mass_airflow_inverse_df = mass_airflow_inverse_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+    reference_torque_inverse_df = reference_torque_inverse_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+
     # Calculate the torque increase factor
     stock_max_torque = indicated_torque_df.max().max()  # Assuming the max value in the indicated torque is the stock max torque
     torque_increase_factor = new_max_torque / stock_max_torque
@@ -52,15 +57,18 @@ if indicated_torque_input and mass_airflow_inverse_input and reference_torque_in
     new_indicated_torque_df = indicated_torque_df * torque_increase_factor
     new_mass_airflow_inverse_df = mass_airflow_inverse_df * boost_increase_factor
 
+    # Display the new tables
     st.write('New Indicated Torque Table:')
     st.dataframe(new_indicated_torque_df)
 
     st.write('New Mass Airflow (Inverse) Table:')
     st.dataframe(new_mass_airflow_inverse_df)
 
+    # Function to format DataFrame for easy copy-pasting
     def format_for_copy_paste(df):
         return df.to_csv(sep='\t', index=False)
 
+    # Provide download buttons for the new tables
     st.download_button(
         label="Download New Indicated Torque Table",
         data=format_for_copy_paste(new_indicated_torque_df),
