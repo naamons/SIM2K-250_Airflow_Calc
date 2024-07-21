@@ -56,10 +56,13 @@ def main():
         # Calculate airflow per torque factor
         airflow_per_torque = airflow_data / torque_axis[:, np.newaxis]
 
-        # Ask for new torque axis
+        # Display the extracted torque axis as an editable table
         st.header("Step 3: Input New Torque Axis")
-        new_torque_axis_input = st.text_area("Enter new torque axis values (one value per line)", "30\n60\n90\n120\n150")
-        new_torque_axis = [int(torque.strip()) for torque in new_torque_axis_input.split("\n")]
+        st.write("The values below are extracted from the uploaded template. You can edit them if needed.")
+        
+        new_torque_df = pd.DataFrame({'New Torque Axis': torque_axis})
+        edited_torque_df = st.experimental_data_editor(new_torque_df)
+        new_torque_axis = edited_torque_df['New Torque Axis'].tolist()
 
         if st.button("Generate New Map"):
             # Calculate new airflow values using the new torque axis
