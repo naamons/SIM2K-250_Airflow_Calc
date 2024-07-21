@@ -32,7 +32,9 @@ new_boost_target = st.number_input("New Boost Pressure Target (PSI)", value=20.0
 # Convert pasted data into DataFrames
 def parse_input_data(input_data):
     data = [line.split() for line in input_data.strip().split('\n')]
-    return pd.DataFrame(data[1:], columns=data[0], dtype=float)
+    df = pd.DataFrame(data[1:], columns=data[0])
+    df = df.apply(pd.to_numeric, errors='coerce')
+    return df
 
 if indicated_torque_input and mass_airflow_inverse_input and reference_torque_inverse_input:
     indicated_torque_df = parse_input_data(indicated_torque_input)
