@@ -54,7 +54,8 @@ def main():
         airflow_data = df.iloc[:, 1:].values
 
         # Calculate airflow per torque factor
-        airflow_per_torque = airflow_data / torque_axis[:, np.newaxis]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            airflow_per_torque = np.where(torque_axis[:, np.newaxis] != 0, airflow_data / torque_axis[:, np.newaxis], 0)
 
         # Display the extracted torque axis as a text area
         st.header("Step 3: Input New Torque Axis")
@@ -66,7 +67,7 @@ def main():
 
         if st.button("Generate New Map"):
             # Calculate new airflow values using the new torque axis
-            new_airflow_values = np.outer(new_torque_axis, airflow_per_torque.mean(axis=0))
+            new_airflow_values = airflow_per_torque * np.array(new_torque_axis)[:, np.newaxis]
 
             # Create a DataFrame to display the results
             result_df = pd.DataFrame(new_airflow_values, columns=df.columns[1:], index=new_torque_axis)
