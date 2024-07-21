@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Step 1: Create a downloadable combined CSV template
-def create_combined_template():
-    template_data1 = {
+# Step 1: Create downloadable CSV templates
+def create_templates():
+    # Airflow Map Template
+    airflow_template_data = {
         "Torque (Nm)": ["0", "25", "50", "100", "150", "200", "250", "300", "350", "400", "450", "500"],
         "650": ["" for _ in range(12)],
         "800": ["" for _ in range(12)],
@@ -23,9 +24,11 @@ def create_combined_template():
         "6016": ["" for _ in range(12)],
         "6592": ["" for _ in range(12)]
     }
-    df_template1 = pd.DataFrame(template_data1)
-    
-    template_data2 = {
+    df_airflow_template = pd.DataFrame(airflow_template_data)
+    df_airflow_template.to_csv('airflow_template.csv', index=False)
+
+    # Reference Torque Map Template
+    reference_torque_template_data = {
         "Reference Torque (Nm)": ["50.02", "99.997", "199.994", "299.991", "399.013", "499.01", "599.007", "702.014", "800.018", "1000.012", "1200.006", "1400"],
         "650": ["" for _ in range(12)],
         "800": ["" for _ in range(12)],
@@ -44,54 +47,42 @@ def create_combined_template():
         "6016": ["" for _ in range(12)],
         "6592": ["" for _ in range(12)]
     }
-    df_template2 = pd.DataFrame(template_data2)
-    
-    with open('combined_template.csv', 'w') as f:
-        f.write('Airflow Map\n')
-        df_template1.to_csv(f, index=False)
-        f.write('\nReference Torque Map\n')
-        df_template2.to_csv(f, index=False)
+    df_reference_torque_template = pd.DataFrame(reference_torque_template_data)
+    df_reference_torque_template.to_csv('reference_torque_template.csv', index=False)
 
 # Step 2: Streamlit app
 def main():
     st.title("ECU Map Rescaler")
 
-    # Download the template
-    st.header("Step 1: Download the Combined CSV Template")
-    create_combined_template()
-    with open("combined_template.csv", "rb") as file:
-        st.download_button(label="Download Combined CSV Template", data=file, file_name="combined_template.csv", mime="text/csv")
+    # Download the templates
+    st.header("Step 1: Download the CSV Templates")
+    create_templates()
+    with open("airflow_template.csv", "rb") as file1, open("reference_torque_template.csv", "rb") as file2:
+        st.download_button(label="Download Airflow Map CSV Template", data=file1, file_name="airflow_template.csv", mime="text/csv")
+        st.download_button(label="Download Reference Torque CSV Template", data=file2, file_name="reference_torque_template.csv", mime="text/csv")
 
-    # Upload the filled template
-    st.header("Step 2: Upload the Filled Combined CSV Template")
-    uploaded_file = st.file_uploader("Upload your filled combined template", type="csv")
+    # Upload the filled templates
+    st.header("Step 2: Upload the Filled CSV Templates")
+    uploaded_file1 = st.file_uploader("Upload your filled airflow template", type="csv")
+    uploaded_file2 = st.file_uploader("Upload your filled reference torque template", type="csv")
 
-    if uploaded_file is not None:
-        # Read the combined CSV into a DataFrame
-        combined_df = pd.read_csv(uploaded_file, header=None)
-
-        # Locate the split points
-        airflow_start = combined_df[combined_df[0].str.contains("Airflow Map", na=False)].index[0]
-        reference_torque_start = combined_df[combined_df[0].str.contains("Reference Torque Map", na=False)].index[0]
-
-        # Extract the two maps
-        airflow_df = pd.read_csv(uploaded_file, skiprows=airflow_start+1, nrows=reference_torque_start-airflow_start-2)
-        reference_torque_df = pd.read_csv(uploaded_file, skiprows=reference_torque_start+1)
-
+    if uploaded_file1 is not None and uploaded_file2 is not None:
+        df1 = pd.read_csv(uploaded_file1)
         st.write("### Original Airflow Map")
-        st.dataframe(airflow_df)
+        st.dataframe(df1)
 
+        df2 = pd.read_csv(uploaded_file2)
         st.write("### Original Reference Torque Map")
-        st.dataframe(reference_torque_df)
+        st.dataframe(df2)
 
         # Convert to numeric values
-        airflow_df = airflow_df.apply(pd.to_numeric, errors='coerce')
-        reference_torque_df = reference_torque_df.apply(pd.to_numeric, errors='coerce')
+        df1 = df1.apply(pd.to_numeric, errors='coerce')
+        df2 = df2.apply(pd.to_numeric, errors='coerce')
 
         # Extract torque values and RPM axis for airflow map
-        torque_axis1 = airflow_df.iloc[:, 0].values
-        rpm_values1 = airflow_df.columns[1:].astype(int)
-        airflow_data = airflow_df.iloc[:, 1:].values
+        torque_axis1 = df1.iloc[:, 0].values
+        rpm_values1 = df1.columns[1:].astype(int)
+        airflow_data = df1.iloc[:, 1:].values
 
         # Calculate airflow per torque factor
         with np.errstate(divide='ignore', invalid='ignore'):
@@ -105,12 +96,12 @@ def main():
         new_torque_axis_input1 = st.text_area("New Torque Axis (one value per line)", torque_axis_str1)
         new_torque_axis1 = [int(torque.strip()) for torque in new_torque_axis_input1.split("\n")]
 
-        if st.button("Generate New Maps"):
+        if st.button("Generate New Airflow Map"):
             # Calculate new airflow values using the new torque axis
             new_airflow_values = airflow_per_torque * np.array(new_torque_axis1)[:, np.newaxis]
 
             # Create a DataFrame to display the results
-            result_df1 = pd.DataFrame(new_airflow_values, columns=airflow_df.columns[1:], index=new_torque_axis1)
+            result_df1 = pd.DataFrame(new_airflow_values, columns=df1.columns[1:], index=new_torque_axis1)
             result_df1.index.name = "Torque (Nm)"
 
             st.write("### New Airflow Map")
@@ -122,9 +113,9 @@ def main():
 
             # Proceed with the second map
             # Extract reference torque values and RPM axis
-            reference_torque_axis = reference_torque_df.iloc[:, 0].values
-            rpm_values2 = reference_torque_df.columns[1:].astype(int)
-            reference_torque_data = reference_torque_df.iloc[:, 1:].values
+            reference_torque_axis = df2.iloc[:, 0].values
+            rpm_values2 = df2.columns[1:].astype(int)
+            reference_torque_data = df2.iloc[:, 1:].values
 
             # Calculate reference torque per factor
             with np.errstate(divide='ignore', invalid='ignore'):
@@ -137,7 +128,7 @@ def main():
             new_reference_torque_values = reference_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
 
             # Create a DataFrame to display the results
-            result_df2 = pd.DataFrame(new_reference_torque_values, columns=reference_torque_df.columns[1:], index=new_reference_torque_axis)
+            result_df2 = pd.DataFrame(new_reference_torque_values, columns=df2.columns[1:], index=new_reference_torque_axis)
             result_df2.index.name = "Reference Torque (Nm)"
 
             st.write("### New Reference Torque Map")
