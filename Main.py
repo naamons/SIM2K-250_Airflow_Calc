@@ -1,66 +1,108 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.interpolate import interp1d
 
-# Load the Excel workbook
-file_path = '/mnt/data/CN7N TQI and Airflow Workbook.xlsx'
-xls = pd.ExcelFile(file_path)
+# Streamlit UI
+st.title('ECU Tuning Map Adjustments')
+st.write('Upload your Excel file containing the necessary tables.')
 
-# Load necessary sheets
-indicated_torque_df = pd.read_excel(xls, 'Indicated Torque at Reference')
-stock_torque_df = pd.read_excel(xls, 'Stock Torque')
-air_mass_max_df = pd.read_excel(xls, 'Air Mass Max')
-mass_airflow_inverse_df = pd.read_excel(xls, 'Mass Airflow (Inverse)')
-reference_torque_inverse_df = pd.read_excel(xls, 'Reference Torque (Inverse)')
+# File uploader
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
-# Ensure proper data extraction and alignment
-rpm_values_air_mass = air_mass_max_df.iloc[0].values[1:].astype(float)
-air_mass_values = air_mass_max_df.iloc[1:].dropna().values.flatten().astype(float)  # Drop NaN and flatten to ensure proper shape
+if uploaded_file:
+    # Load the Excel workbook
+    xls = pd.ExcelFile(uploaded_file)
 
-# Verify data shapes
-(stock_rpm.shape, stock_torque.shape, air_mass_values.shape)
+    # Load necessary sheets
+    indicated_torque_df = pd.read_excel(xls, 'Indicated Torque at Reference')
+    stock_torque_df = pd.read_excel(xls, 'Stock Torque')
+    air_mass_max_df = pd.read_excel(xls, 'Air Mass Max')
+    mass_airflow_inverse_df = pd.read_excel(xls, 'Mass Airflow (Inverse)')
+    reference_torque_inverse_df = pd.read_excel(xls, 'Reference Torque (Inverse)')
 
-# Ensure the air mass values match the stock torque for interpolation
-assert len(stock_torque) == len(air_mass_values), "Length mismatch between stock torque and air mass values"
-
-# Set new target torque values for testing
-new_torque_targets = np.array([298.28, 318.62, 332.18, 338.95, 345.73, 352.51, 349.80, 345.73, 336.24, 325.40, 298.28])
-rpm_values = np.array([1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500])
-
-# Function to interpolate and extend the map
-def interpolate_airflow(new_torque_targets, stock_torque_df, air_mass_values, rpm_values_air_mass):
+    # Ensure proper data extraction and alignment
+    rpm_values_air_mass = air_mass_max_df.iloc[0].values[1:].astype(float)
+    air_mass_values = air_mass_max_df.iloc[1:].dropna().values.flatten().astype(float)
+    stock_rpm = stock_torque_df['RPM'].values
     stock_torque = stock_torque_df['Torque (Nm)'].values
-    
-    new_air_mass_values = np.zeros((len(rpm_values), len(rpm_values_air_mass)))
-    
-    for i, rpm in enumerate(rpm_values):
-        air_mass_interp_func = interp1d(stock_torque, air_mass_values, kind='linear', fill_value='extrapolate')
-        new_air_mass_values[i] = air_mass_interp_func(new_torque_targets)
-    
-    return new_air_mass_values
 
-# Generate the new air mass map
-new_air_mass_values = interpolate_airflow(new_torque_targets, stock_torque_df, air_mass_values, rpm_values_air_mass)
+    # Set default new target torque values
+    default_new_torque_targets = np.array([298.28, 318.62, 332.18, 338.95, 345.73, 352.51, 349.80, 345.73, 336.24, 325.40, 298.28])
+    rpm_values = np.array([1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500])
 
-# Create DataFrame for the new air mass map
-new_air_mass_df = pd.DataFrame(new_air_mass_values, index=rpm_values, columns=rpm_values_air_mass)
+    st.write('Input your desired torque values over the RPM range.')
 
-# Function to create inverse maps and indicated torque
-def create_inverse_maps(new_air_mass_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_torque_targets):
-    mass_airflow_inverse_df = mass_airflow_inverse_df.copy()
-    reference_torque_inverse_df = reference_torque_inverse_df.copy()
+    # User inputs for new targets
+    new_torque_targets = []
+    for rpm in rpm_values:
+        torque_value = st.number_input(f'Torque at {rpm} RPM (Nm)', value=float(default_new_torque_targets[list(rpm_values).index(rpm)]))
+        new_torque_targets.append(torque_value)
+    new_torque_targets = np.array(new_torque_targets)
 
-    for col in new_air_mass_df.columns:
-        mass_airflow_inverse_df[col] = new_air_mass_df.loc[:, col].values
-        reference_torque_inverse_df[col] = new_torque_targets
+    # Interpolate and extrapolate new airflow values
+    def interpolate_airflow(new_torque_targets, stock_torque_df, air_mass_values, rpm_values_air_mass):
+        stock_torque = stock_torque_df['Torque (Nm)'].values
 
-    return mass_airflow_inverse_df, reference_torque_inverse_df
+        new_air_mass_values = np.zeros((len(rpm_values), len(rpm_values_air_mass)))
 
-# Create the inverse maps and indicated torque
-new_mass_airflow_inverse_df, new_reference_torque_inverse_df = create_inverse_maps(new_air_mass_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_torque_targets)
+        for i, rpm in enumerate(rpm_values):
+            air_mass_interp_func = interp1d(stock_torque, air_mass_values, kind='linear', fill_value='extrapolate')
+            new_air_mass_values[i] = air_mass_interp_func(new_torque_targets)
 
-import ace_tools as tools; tools.display_dataframe_to_user(name="New Air Mass Map", dataframe=new_air_mass_df)
-tools.display_dataframe_to_user(name="New Mass Airflow (Inverse) Table", dataframe=new_mass_airflow_inverse_df)
-tools.display_dataframe_to_user(name="New Reference Torque (Inverse) Table", dataframe=new_reference_torque_inverse_df)
+        return new_air_mass_values
 
-(new_air_mass_df, new_mass_airflow_inverse_df, new_reference_torque_inverse_df)
+    # Generate the new air mass map
+    new_air_mass_values = interpolate_airflow(new_torque_targets, stock_torque_df, air_mass_values, rpm_values_air_mass)
+
+    # Create DataFrame for the new air mass map
+    new_air_mass_df = pd.DataFrame(new_air_mass_values, index=rpm_values, columns=rpm_values_air_mass)
+
+    st.write('New Air Mass Table:')
+    st.dataframe(new_air_mass_df)
+
+    # Function to create inverse maps and indicated torque
+    def create_inverse_maps(new_air_mass_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_torque_targets):
+        mass_airflow_inverse_df = mass_airflow_inverse_df.copy()
+        reference_torque_inverse_df = reference_torque_inverse_df.copy()
+
+        for col in new_air_mass_df.columns:
+            mass_airflow_inverse_df[col] = new_air_mass_df.loc[:, col].values
+            reference_torque_inverse_df[col] = new_torque_targets
+
+        return mass_airflow_inverse_df, reference_torque_inverse_df
+
+    # Create the inverse maps and indicated torque
+    new_mass_airflow_inverse_df, new_reference_torque_inverse_df = create_inverse_maps(new_air_mass_df, mass_airflow_inverse_df, reference_torque_inverse_df, new_torque_targets)
+
+    st.write('New Mass Airflow (Inverse) Table:')
+    st.dataframe(new_mass_airflow_inverse_df)
+
+    st.write('New Reference Torque (Inverse) Table:')
+    st.dataframe(new_reference_torque_inverse_df)
+
+    # Function to format DataFrame for easy copy-pasting
+    def format_for_copy_paste(df):
+        return df.to_csv(sep='\t', index=False)
+
+    # Provide download buttons for the new tables
+    st.download_button(
+        label="Download New Air Mass Table",
+        data=format_for_copy_paste(new_air_mass_df),
+        file_name='new_air_mass_table.csv',
+        mime='text/csv'
+    )
+
+    st.download_button(
+        label="Download New Mass Airflow (Inverse) Table",
+        data=format_for_copy_paste(new_mass_airflow_inverse_df),
+        file_name='new_mass_airflow_inverse_table.csv',
+        mime='text/csv'
+    )
+
+    st.download_button(
+        label="Download New Reference Torque (Inverse) Table",
+        data=format_for_copy_paste(new_reference_torque_inverse_df),
+        file_name='new_reference_torque_inverse_table.csv',
+        mime='text/csv'
+    )
