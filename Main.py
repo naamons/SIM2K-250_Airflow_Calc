@@ -21,11 +21,9 @@ if uploaded_file:
     mass_airflow_inverse_df = pd.read_excel(xls, 'Mass Airflow (Inverse)')
     reference_torque_inverse_df = pd.read_excel(xls, 'Reference Torque (Inverse)')
 
-    # Ensure proper data extraction and alignment
-    rpm_values_air_mass = air_mass_max_df.iloc[0].values[1:].astype(float)
-    air_mass_values = air_mass_max_df.iloc[1:].dropna().values.flatten().astype(float)
-    stock_rpm = stock_torque_df['RPM'].values
-    stock_torque = stock_torque_df['Torque (Nm)'].values
+    # Extract RPM and air mass values correctly
+    rpm_values_air_mass = air_mass_max_df.iloc[0, 1:].astype(float).values
+    air_mass_values = air_mass_max_df.iloc[1:, 1:].values.flatten().astype(float)
 
     # Set default new target torque values
     default_new_torque_targets = np.array([298.28, 318.62, 332.18, 338.95, 345.73, 352.51, 349.80, 345.73, 336.24, 325.40, 298.28])
