@@ -1,194 +1,96 @@
 import streamlit as st
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 import numpy as np
+import io
 
-# Step 1: Create downloadable CSV templates
-def create_templates():
-    # Airflow Map Template
-    airflow_template_data = {
-        "Torque (Nm)": ["0", "25", "50", "100", "150", "200", "250", "300", "350", "400", "450", "500"],
-        "650": ["" for _ in range(12)],
-        "800": ["" for _ in range(12)],
-        "992": ["" for _ in range(12)],
-        "1248": ["" for _ in range(12)],
-        "1500": ["" for _ in range(12)],
-        "1750": ["" for _ in range(12)],
-        "2016": ["" for _ in range(12)],
-        "2496": ["" for _ in range(12)],
-        "3008": ["" for _ in range(12)],
-        "3488": ["" for _ in range(12)],
-        "4000": ["" for _ in range(12)],
-        "4512": ["" for _ in range(12)],
-        "4992": ["" for _ in range(12)],
-        "5504": ["" for _ in range(12)],
-        "6016": ["" for _ in range(12)],
-        "6592": ["" for _ in range(12)]
-    }
-    df_airflow_template = pd.DataFrame(airflow_template_data)
-    df_airflow_template.to_csv('airflow_template.csv', index=False)
+def preprocess_data(df):
+    # Handle NaNs and convert data types
+    df = df.apply(pd.to_numeric, errors='coerce')
+    df = df.fillna(method='ffill').fillna(method='bfill')
+    return df
 
-    # Reference Torque Map Template
-    reference_torque_template_data = {
-        "Reference Torque (Nm)": ["50.02", "99.997", "199.994", "299.991", "399.013", "499.01", "599.007", "702.014", "800.018", "1000.012", "1200.006", "1400"],
-        "650": ["" for _ in range(12)],
-        "800": ["" for _ in range(12)],
-        "992": ["" for _ in range(12)],
-        "1248": ["" for _ in range(12)],
-        "1500": ["" for _ in range(12)],
-        "1750": ["" for _ in range(12)],
-        "2016": ["" for _ in range(12)],
-        "2496": ["" for _ in range(12)],
-        "3008": ["" for _ in range(12)],
-        "3488": ["" for _ in range(12)],
-        "4000": ["" for _ in range(12)],
-        "4512": ["" for _ in range(12)],
-        "4992": ["" for _ in range(12)],
-        "5504": ["" for _ in range(12)],
-        "6016": ["" for _ in range(12)],
-        "6592": ["" for _ in range(12)]
-    }
-    df_reference_torque_template = pd.DataFrame(reference_torque_template_data)
-    df_reference_torque_template.to_csv('reference_torque_template.csv', index=False)
+def load_data(file):
+    xls = pd.ExcelFile(file)
+    sheets = xls.sheet_names
+    data = {sheet: preprocess_data(pd.read_excel(xls, sheet_name=sheet)) for sheet in sheets}
+    return data
 
-    # Indicated Torque at Reference Conditions Map Template
-    indicated_torque_template_data = {
-        "Indicated Torque (Nm)": ["50", "163", "277", "390", "504", "618", "731", "845", "959", "1072", "1186", "1300"],
-        "650": ["" for _ in range(12)],
-        "800": ["" for _ in range(12)],
-        "992": ["" for _ in range(12)],
-        "1248": ["" for _ in range(12)],
-        "1500": ["" for _ in range(12)],
-        "1750": ["" for _ in range(12)],
-        "2016": ["" for _ in range(12)],
-        "2496": ["" for _ in range(12)],
-        "3008": ["" for _ in range(12)],
-        "3488": ["" for _ in range(12)],
-        "4000": ["" for _ in range(12)],
-        "4512": ["" for _ in range(12)],
-        "4992": ["" for _ in range(12)],
-        "5504": ["" for _ in range(12)],
-        "6016": ["" for _ in range(12)],
-        "6592": ["" for _ in range(12)]
-    }
-    df_indicated_torque_template = pd.DataFrame(indicated_torque_template_data)
-    df_indicated_torque_template.to_csv('indicated_torque_template.csv', index=False)
+def train_model(data):
+    X = []
+    y = []
+    for sheet, df in data.items():
+        x_values = df.iloc[:, 0].values
+        y_values = df.columns[1:].astype(float)
+        for i, x in enumerate(x_values):
+            for j, y_val in enumerate(y_values):
+                X.append([x, y_val])
+                y.append(df.iloc[i, j + 1])
+    X = np.array(X)
+    y = np.array(y)
+    model = RandomForestRegressor(n_estimators=100, random_state=0)
+    model.fit(X, y)
+    return model
 
-# Step 2: Streamlit app
-def main():
-    st.title("ECU Map Rescaler")
+def interpolate(model, x_range, y_values):
+    new_X = np.array([[x, y] for x in x_range for y in y_values])
+    new_y = model.predict(new_X)
+    interpolated_values = new_y.reshape(len(x_range), len(y_values))
+    return interpolated_values
 
-    # Download the templates
-    st.header("Step 1: Download the CSV Templates")
-    create_templates()
-    with open("airflow_template.csv", "rb") as file1, open("reference_torque_template.csv", "rb") as file2, open("indicated_torque_template.csv", "rb") as file3:
-        st.download_button(label="Download Airflow Map CSV Template", data=file1, file_name="airflow_template.csv", mime="text/csv")
-        st.download_button(label="Download Reference Torque CSV Template", data=file2, file_name="reference_torque_template.csv", mime="text/csv")
-        st.download_button(label="Download Indicated Torque CSV Template", data=file3, file_name="indicated_torque_template.csv", mime="text/csv")
+def create_template():
+    columns = ["Torque (Nm)"] + [f"RPM {i}" for i in range(1, 11)]
+    data = [[i*10 for i in range(11)] for _ in range(10)]
+    df_template = pd.DataFrame(data, columns=columns)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_template.to_excel(writer, index=False, sheet_name='Sheet1')
+        writer.save()
+    processed_data = output.getvalue()
+    return processed_data
 
-    # Upload the filled templates
-    st.header("Step 2: Upload the Filled CSV Templates")
-    uploaded_file1 = st.file_uploader("Upload your filled airflow template", type="csv")
-    uploaded_file2 = st.file_uploader("Upload your filled reference torque template", type="csv")
-    uploaded_file3 = st.file_uploader("Upload your filled indicated torque template", type="csv")
+st.title("3D Table Interpolation App")
 
-    if uploaded_file1 is not None and uploaded_file2 is not None and uploaded_file3 is not None:
-        df1 = pd.read_csv(uploaded_file1)
-        st.write("### Original Airflow Map")
-        st.dataframe(df1)
+# Provide a downloadable template
+st.download_button(
+    label="Download Template",
+    data=create_template(),
+    file_name="3D_Table_Template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
-        df2 = pd.read_csv(uploaded_file2)
-        st.write("### Original Reference Torque Map")
-        st.dataframe(df2)
-
-        df3 = pd.read_csv(uploaded_file3)
-        st.write("### Original Indicated Torque Map")
-        st.dataframe(df3)
-
-        # Convert to numeric values
-        df1 = df1.apply(pd.to_numeric, errors='coerce')
-        df2 = df2.apply(pd.to_numeric, errors='coerce')
-        df3 = df3.apply(pd.to_numeric, errors='coerce')
-
-        # Extract torque values and RPM axis for airflow map
-        torque_axis1 = df1.iloc[:, 0].values
-        rpm_values1 = df1.columns[1:].astype(int)
-        airflow_data = df1.iloc[:, 1:].values
-
-        # Calculate airflow per torque factor
-        with np.errstate(divide='ignore', invalid='ignore'):
-            airflow_per_torque = np.where(torque_axis1[:, np.newaxis] != 0, airflow_data / torque_axis1[:, np.newaxis], 0)
-
-        # Display the extracted torque axis as a text area
-        st.header("Step 3: Input New Torque Axis for Airflow Map")
-        st.write("The values below are extracted from the uploaded template. You can edit them if needed.")
-        
-        torque_axis_str1 = "\n".join(map(str, torque_axis1))
-        new_torque_axis_input1 = st.text_area("New Torque Axis (one value per line)", torque_axis_str1)
-        new_torque_axis1 = [int(torque.strip()) for torque in new_torque_axis_input1.split("\n")]
-
-        if st.button("Generate New Airflow Map"):
-            # Calculate new airflow values using the new torque axis
-            new_airflow_values = airflow_per_torque * np.array(new_torque_axis1)[:, np.newaxis]
-
-            # Create a DataFrame to display the results
-            result_df1 = pd.DataFrame(new_airflow_values, columns=df1.columns[1:], index=new_torque_axis1)
-            result_df1.index.name = "Torque (Nm)"
-
-            st.write("### New Airflow Map")
-            st.dataframe(result_df1)
-
-            # Provide option to download the new map as a CSV
-            csv1 = result_df1.to_csv().encode('utf-8')
-            st.download_button(label="Download New Airflow Map as CSV", data=csv1, file_name='new_airflow_map.csv', mime='text/csv')
-
-                        # Proceed with the reference torque map
-            reference_torque_axis = df2.iloc[:, 0].values
-            rpm_values2 = df2.columns[1:].astype(int)
-            reference_torque_data = df2.iloc[:, 1:].values
-
-            # Calculate reference torque per factor
-            with np.errstate(divide='ignore', invalid='ignore'):
-                reference_torque_per_factor = np.where(reference_torque_axis[:, np.newaxis] != 0, reference_torque_data / reference_torque_axis[:, np.newaxis], 0)
-
-            # Generate new reference torque axis
-            new_reference_torque_axis = [50] + [np.mean(result_df1.iloc[i]) for i in range(1, len(result_df1))]
-
-            # Calculate new reference torque values using the new torque axis
-            new_reference_torque_values = reference_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
-
-            # Create a DataFrame to display the results
-            result_df2 = pd.DataFrame(new_reference_torque_values, columns=df2.columns[1:], index=new_reference_torque_axis)
-            result_df2.index.name = "Reference Torque (Nm)"
-
-            st.write("### New Reference Torque Map")
-            st.dataframe(result_df2)
-
-            # Provide option to download the new map as a CSV
-            csv2 = result_df2.to_csv().encode('utf-8')
-            st.download_button(label="Download New Reference Torque Map as CSV", data=csv2, file_name='new_reference_torque_map.csv', mime='text/csv')
-
-            # Proceed with the indicated torque map
-            indicated_torque_axis = df3.iloc[:, 0].values
-            rpm_values3 = df3.columns[1:].astype(int)
-            indicated_torque_data = df3.iloc[:, 1:].values
-
-            # Calculate indicated torque per factor
-            with np.errstate(divide='ignore', invalid='ignore'):
-                indicated_torque_per_factor = np.where(indicated_torque_axis[:, np.newaxis] != 0, indicated_torque_data / indicated_torque_axis[:, np.newaxis], 0)
-
-            # Use the same new_reference_torque_axis for indicated torque
-            new_indicated_torque_values = indicated_torque_per_factor * np.array(new_reference_torque_axis)[:, np.newaxis]
-
-            # Create a DataFrame to display the results
-            result_df3 = pd.DataFrame(new_indicated_torque_values, columns=df3.columns[1:], index=new_reference_torque_axis)
-            result_df3.index.name = "Indicated Torque (Nm)"
-
-            st.write("### New Indicated Torque Map")
-            st.dataframe(result_df3)
-
-            # Provide option to download the new map as a CSV
-            csv3 = result_df3.to_csv().encode('utf-8')
-            st.download_button(label="Download New Indicated Torque Map as CSV", data=csv3, file_name='new_indicated_torque_map.csv', mime='text/csv')
-
-if __name__ == "__main__":
-    main()
+uploaded_file = st.file_uploader("Upload an Excel file", type="xlsx")
+if uploaded_file is not None:
+    data = load_data(uploaded_file)
+    st.write("Sheets loaded:", list(data.keys()))
+    
+    axis_label = st.selectbox("Select the axis to expand", ["Torque (Nm)", "Airflow"])
+    new_scale = st.number_input(f"Expand {axis_label} to", min_value=0, max_value=1000, value=650, step=1)
+    
+    model = train_model(data)
+    
+    sample_sheet = next(iter(data.values()))
+    y_values = sample_sheet.columns[1:].astype(float)
+    x_range = np.linspace(sample_sheet.iloc[:, 0].min(), new_scale, num=sample_sheet.shape[0] + 1)
+    
+    interpolated_values = interpolate(model, x_range, y_values)
+    
+    df_interpolated = pd.DataFrame(interpolated_values, columns=y_values)
+    df_interpolated.insert(0, axis_label, x_range)
+    
+    st.write(f"Interpolated 3D Table for {axis_label}")
+    st.dataframe(df_interpolated)
+    
+    # Convert dataframe to excel
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_interpolated.to_excel(writer, index=False, sheet_name='Interpolated Data')
+        writer.save()
+    processed_data = output.getvalue()
+    
+    st.download_button(
+        label="Download Interpolated Table",
+        data=processed_data,
+        file_name="Interpolated_Mass_Airflow.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
