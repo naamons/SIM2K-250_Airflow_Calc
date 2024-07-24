@@ -16,11 +16,10 @@ if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file, sheet_name=None)  # Reading all sheets
 
-        # Assuming the sheet names are indicative of the data
-        st.write("Sheets found:", list(df.keys()))
-
-        # For simplicity, let's assume the first sheet contains the necessary data
-        first_sheet_name = list(df.keys())[0]
+        # Display available sheets and select the first sheet
+        sheet_names = list(df.keys())
+        st.write("Sheets found:", sheet_names)
+        first_sheet_name = sheet_names[0]
         data_df = df[first_sheet_name]
 
         # Display the data
@@ -28,7 +27,6 @@ if uploaded_file is not None:
         st.write(data_df)
 
         # Extract RPM and Torque axis, and data values
-        # Assuming a specific format where first row is RPM, first column is Torque, and rest is data
         rpm_axis = data_df.columns[1:].astype(float).tolist()
         torque_axis = data_df.iloc[:, 0].astype(float).tolist()
         data = data_df.iloc[:, 1:].values
@@ -70,15 +68,24 @@ if uploaded_file is not None:
             model = models[rpm]
             interpolated_data[:, i] = model.predict(new_torque_range.reshape(-1, 1))
 
+        # Debugging output to check array lengths
+        st.write("Interpolated Data Shape:", interpolated_data.shape)
+        st.write("RPM Axis Length:", len(rpm_axis))
+
         # Adjust to final size
         final_rpm_range = np.linspace(rpm_axis[0], rpm_axis[-1], final_rows)
         final_data = np.zeros((final_rows, final_cols))
 
-        # Interpolation with checks
+        # Adjusted interpolation with checks
         try:
             for i in range(final_cols):
-                f = interp1d(rpm_axis, interpolated_data[:, i], kind='linear', bounds_error=False, fill_value="extrapolate")
-                final_data[:, i] = f(final_rpm_range)
+                # Check if rpm_axis length matches the number of columns in interpolated_data
+                if len(rpm_axis) == interpolated_data.shape[1]:
+                    f = interp1d(rpm_axis, interpolated_data[:, i], kind='linear', bounds_error=False, fill_value="extrapolate")
+                    final_data[:, i] = f(final_rpm_range)
+                else:
+                    st.error("Mismatch in length between RPM axis and data columns. Please check your data.")
+                    st.stop()
         except ValueError as e:
             st.error(f"Interpolation error: {e}")
             st.stop()
