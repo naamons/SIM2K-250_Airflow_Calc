@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from scipy.interpolate import interp1d
 
 # Streamlit app
 st.title("3D Table Adjuster")
@@ -58,6 +57,11 @@ if uploaded_file is not None:
         for i, rpm in enumerate(rpm_axis):
             model = models[rpm]
             new_data[:, i] = model.predict(new_torque_range.reshape(-1, 1))
+
+        # Adjust data scaling to align with original values
+        original_max_torque = max(torque_axis)
+        scaling_factor = original_max_torque / new_torque_target
+        new_data = new_data * scaling_factor
 
         # Display and download options
         final_df = pd.DataFrame(new_data, columns=[f'RPM {int(rpm)}' for rpm in rpm_axis], index=new_torque_range)
