@@ -1,6 +1,5 @@
-streamlit
-pandas
-scikit-learn
-openpyxl
-xlsxwriter
-numpy
+streamlit==1.22.0
+numpy==1.25.1
+pandas==2.0.3
+scikit-learn==1.3.0
+scipy==1.11.1
