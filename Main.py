@@ -49,12 +49,22 @@ for i, rpm in enumerate(rpm_axis):
     model = models[rpm]
     interpolated_data[:, i] = model.predict(new_torque_range.reshape(-1, 1))
 
+# Debugging output to check array lengths
+st.write("Interpolated Data Shape:", interpolated_data.shape)
+st.write("RPM Axis Length:", len(rpm_axis))
+
 # Adjust to final size
 final_rpm_range = np.linspace(rpm_axis[0], rpm_axis[-1], final_rows)
 final_data = np.zeros((final_rows, final_cols))
-for i in range(final_cols):
-    f = interp1d(rpm_axis, interpolated_data[:, i], kind='linear')
-    final_data[:, i] = f(final_rpm_range)
+
+# Adjusted interpolation with checks
+try:
+    for i in range(final_cols):
+        f = interp1d(rpm_axis, interpolated_data[:, i], kind='linear')
+        final_data[:, i] = f(final_rpm_range)
+except ValueError as e:
+    st.error(f"Interpolation error: {e}")
+    st.stop()
 
 # Display and download options
 final_df = pd.DataFrame(final_data, columns=[f'RPM {int(rpm)}' for rpm in final_rpm_range], index=new_torque_range)
