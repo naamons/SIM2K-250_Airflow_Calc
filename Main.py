@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 
 # Streamlit app
 st.title("3D Table Adjuster")
@@ -43,25 +43,20 @@ if uploaded_file is not None:
         # Create a new torque axis with the same number of points, extending to the new maximum
         new_torque_range = np.linspace(min(torque_axis), new_torque_target, original_rows)
 
-        # Linear regression for each RPM column
+        # Use Random Forest for each RPM column
         models = {}
         for i, rpm in enumerate(rpm_axis):
             X = np.array(torque_axis).reshape(-1, 1)
             y = data[:, i]
-            model = LinearRegression()
+            model = RandomForestRegressor(n_estimators=100, random_state=42)
             model.fit(X, y)
             models[rpm] = model
 
-        # Interpolate the data to the new torque range
+        # Predict the data using the new torque range
         new_data = np.zeros((original_rows, original_cols))
         for i, rpm in enumerate(rpm_axis):
             model = models[rpm]
             new_data[:, i] = model.predict(new_torque_range.reshape(-1, 1))
-
-        # Adjust data scaling to align with original values
-        original_max_torque = max(torque_axis)
-        scaling_factor = original_max_torque / new_torque_target
-        new_data = new_data * scaling_factor
 
         # Display and download options
         final_df = pd.DataFrame(new_data, columns=[f'RPM {int(rpm)}' for rpm in rpm_axis], index=new_torque_range)
